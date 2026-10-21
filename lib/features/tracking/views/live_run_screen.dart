@@ -1,3 +1,48 @@
+<<<<<<< HEAD
+import 'package:flutter/material.dart';
+
+class LiveRunScreen extends StatelessWidget {
+  const LiveRunScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Active Run Tracking'), backgroundColor: Colors.transparent),
+      body: Column(
+        children: [
+          // Map Placeholder Area
+          Expanded(
+            flex: 3,
+            child: Container(
+              margin: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E2C),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF6C5CE7), width: 1),
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.map, size: 60, color: Colors.grey),
+                    SizedBox(height: 8),
+                    Text('Google Maps LBS Live Polyline Area', style: TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Realtime Stats
+          Expanded(
+            flex: 2,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1E1E2C),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+=======
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -226,10 +271,29 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+>>>>>>> 2bc424decba5c876172aaae445851ffce3b4c1ce
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
+<<<<<<< HEAD
+                      _buildStatItem('DISTANCE', '3.45', 'km'),
+                      _buildStatItem('STEPS', '4,820', 'steps'),
+                      _buildStatItem('PACE', '5\'30"', '/km'),
+                    ],
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00B894),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('START RUNNING', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+=======
                       _buildStatColumn(
                         'JARAK LARI',
                         '${(_totalDistanceMeters / 1000).toStringAsFixed(2)} km',
@@ -267,6 +331,7 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
                           fontSize: 15,
                         ),
                       ),
+>>>>>>> 2bc424decba5c876172aaae445851ffce3b4c1ce
                     ),
                   ),
                 ],
@@ -278,6 +343,19 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
     );
   }
 
+<<<<<<< HEAD
+  static Widget _buildStatItem(String label, String value, String unit) {
+    return Column(
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+        Text(unit, style: const TextStyle(color: Color(0xFF6C5CE7), fontSize: 12)),
+      ],
+    );
+  }
+}
+=======
   Widget _buildStatColumn(String label, String value) {
     return Column(
       children: [
@@ -302,3 +380,4 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
     );
   }
 }
+>>>>>>> 2bc424decba5c876172aaae445851ffce3b4c1ce
