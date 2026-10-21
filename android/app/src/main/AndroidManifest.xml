@@ -1,11 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-<<<<<<< HEAD
 
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
     
-=======
->>>>>>> 2bc424decba5c876172aaae445851ffce3b4c1ce
     <application
         android:label="geezus"
         android:name="${applicationName}"
