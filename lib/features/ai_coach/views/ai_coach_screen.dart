@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/gym_store.dart';
 
 class AiCoachScreen extends StatefulWidget {
   const AiCoachScreen({super.key});
@@ -19,13 +20,11 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     {
       'sender': 'ai',
       'text': 'Halo Bro! Selamat datang di Geezus. 🏋️‍♂️\n\n'
-          'Habis latihan apa hari ini? Kamu tinggal ketik nama latihan, beban, set, dan rep-nya. Contoh:\n'
+          'Habis latihan apa hari ini? Ketik nama latihan, beban, set, dan rep-nya. Contoh:\n'
           '👉 "Habis Bench Press 40kg 3 set 10 rep"',
       'time': '10:00 AM',
     },
   ];
-
-  double _sessionVolumeKg = 0.0;
 
   @override
   void dispose() {
@@ -50,7 +49,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
     _scrollToBottom();
 
-    Future.delayed(const Duration(milliseconds: 800), () {
+    Future.delayed(const Duration(milliseconds: 600), () {
       if (!mounted) return;
       _processAiResponse(userText);
       _scrollToBottom();
@@ -73,17 +72,25 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
       int sets = int.parse(setMatch.group(1)!);
       int reps = int.parse(repMatch.group(1)!);
 
+      // Ambil nama gerakan (bersihkan kata angka/kg/set/rep)
+      String exerciseName = input
+          .replaceAll(RegExp(r'\d+(\.\d+)?\s*kg|\d+\s*set|\d+\s*rep|habis|catat|saya', caseSensitive: false), '')
+          .trim();
+      if (exerciseName.isEmpty) exerciseName = 'Gym Workout';
+
+      // Simpan ke GymStore terpusat agar Damage Boss bertambah!
+      GymStore.instance.addLog(exerciseName, weight, sets, reps);
+
       double addedVolume = weight * sets * reps;
-      _sessionVolumeKg += addedVolume;
 
       setState(() {
         _messages.add({
           'sender': 'ai',
-          'text': '🔥 *MANTAP BRO! LATIHAN TERCATAT!*\n\n'
-              '• Beban: $weight kg\n'
-              '• Set & Reps: $sets set x $reps rep\n'
-              '• Total Volume Ditambah: +${addedVolume.toInt()} kg\n\n'
-              '⚡ *+${addedVolume.toInt()} Damage* telah dikirim ke Laman Dungeon untuk melawan Boss Mingguan!',
+          'text': '🔥 *LATIHAN TERCATAT KE DUNGEON!*\n\n'
+              '• Latihan: ${exerciseName.toUpperCase()}\n'
+              '• Beban & Reps: $weight kg ($sets set x $reps rep)\n'
+              '• Volume Tambahan: +${addedVolume.toInt()} kg\n\n'
+              '⚡ *+${(addedVolume * 0.08).round()} Damage* berhasil ditambahkan ke Boss Dungeon!',
           'time': _getCurrentTime(),
         });
       });
@@ -91,8 +98,8 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
       setState(() {
         _messages.add({
           'sender': 'ai',
-          'text': 'Sip bro! Agar masuk ke hitungan *Damage Dungeon*, sertakan format angka **kg**, **set**, dan **rep** ya.\n\n'
-              'Contoh: *"Dumbbell Curl 10kg 3 set 12 rep"*',
+          'text': 'Sip bro! Agar masuk ke hitungan *Damage Dungeon*, pastikan menyertakan format **kg**, **set**, dan **rep** ya.\n\n'
+              'Contoh: *"Squat 60kg 4 set 8 rep"*',
           'time': _getCurrentTime(),
         });
       });
@@ -142,7 +149,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 Text(
-                  '● Online | Input Angkatan',
+                  '● Online | Dynamic Damage Active',
                   style: TextStyle(fontSize: 11, color: Colors.greenAccent),
                 ),
               ],
@@ -153,25 +160,29 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: _cardColor.withOpacity(0.5),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    '🏋️ Total Volume Input Sesi Ini:',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                  Text(
-                    '${_sessionVolumeKg.toInt()} kg',
-                    style: const TextStyle(
-                      color: _primaryColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+            // Header Real-Time Volume
+            AnimatedBuilder(
+              animation: GymStore.instance,
+              builder: (context, _) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                color: _cardColor.withOpacity(0.5),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '🏋️ Total Volume Gym Terakumulasi:',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
                     ),
-                  ),
-                ],
+                    Text(
+                      '${GymStore.instance.totalVolumeKg.toInt()} kg',
+                      style: const TextStyle(
+                        color: _primaryColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             Expanded(

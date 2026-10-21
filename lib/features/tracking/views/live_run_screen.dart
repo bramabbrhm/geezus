@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import '../../../core/services/gym_store.dart';
 
 class LiveRunScreen extends StatefulWidget {
   const LiveRunScreen({super.key});
@@ -17,16 +19,16 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
   static const Color _cardColor = Color(0xFF1E1E2C);
   static const Color _bgColor = Color(0xFF121212);
 
-  // Map Controller & Koordinat Default (Jakarta / Monas)
-  final MapController _mapController = MapController();
-  LatLng _currentPosition = const LatLng(-6.175392, 106.827153);
-
-  // Tracking State
-  final List<LatLng> _routePoints = [];
-  StreamSubscription<Position>? _positionSubscription;
+  // State Pelacakan GPS & Peta
   bool _isTracking = false;
-  double _totalDistanceMeters = 0.0;
   bool _isMapReady = false;
+  final List<LatLng> _routePoints = [];
+  double _totalDistanceMeters = 0.0;
+  StreamSubscription<Position>? _positionSubscription;
+
+  // Koordinat awal default (Jakarta / Posisi Awal)
+  LatLng _currentPosition = const LatLng(-6.200000, 106.816666);
+  final MapController _mapController = MapController();
 
   @override
   void initState() {
@@ -41,33 +43,31 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
     super.dispose();
   }
 
-  // Cek Izin & Ambil Lokasi Awal secara Aman
+  // Cek dan Minta Izin GPS
   Future<void> _checkLocationPermission() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+
+    if (permission == LocationPermission.deniedForever) return;
+
+    // Dapatkan posisi terkini untuk center peta
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return;
-      }
-
-      if (permission == LocationPermission.deniedForever) return;
-
       Position position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
+        desiredAccuracy: LocationAccuracy.high,
       );
-
-      if (!mounted) return;
-      setState(() {
-        _currentPosition = LatLng(position.latitude, position.longitude);
-      });
-
-      // Pindahkan kamera hanya jika peta sudah siap dirender
-      if (_isMapReady) {
+      if (mounted) {
+        setState(() {
+          _currentPosition = LatLng(position.latitude, position.longitude);
+        });
         _safeMoveMap(_currentPosition, 16.0);
       }
     } catch (e) {
@@ -75,21 +75,36 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
     }
   }
 
-  // Pindahkan Kamera Peta dengan Safe Guard
   void _safeMoveMap(LatLng center, double zoom) {
     if (_isMapReady) {
-      try {
-        _mapController.move(center, zoom);
-      } catch (e) {
-        debugPrint('MapController belum siap dipanggil: $e');
-      }
+      _mapController.move(center, zoom);
     }
   }
 
-  // Mulai / Hentikan Tracking Lari
+  // Mulai atau Hentikan Tracking Lari
   void _toggleTracking() {
     if (_isTracking) {
       _positionSubscription?.cancel();
+
+      final double runKm = _totalDistanceMeters / 1000;
+
+      if (runKm > 0) {
+        // Kirim jarak lari ke GymStore terpusat agar Bonus Damage bertambah!
+        GymStore.instance.addRunDistance(runKm);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: _primaryColor,
+              content: Text(
+                '🏃 Lari Selesai! +${runKm.toStringAsFixed(2)} km (+${(runKm * 25).round()} Speed Damage) dikirim ke Dungeon!',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          );
+        }
+      }
+
       setState(() {
         _isTracking = false;
       });
@@ -103,200 +118,194 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
 
       const locationSettings = LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 3, // Update tiap berpindah 3 meter
+        distanceFilter: 3,
       );
 
-      _positionSubscription =
-          Geolocator.getPositionStream(
-            locationSettings: locationSettings,
-          ).listen(
-            (Position position) {
-              if (!mounted) return;
+      _positionSubscription = Geolocator.getPositionStream(
+        locationSettings: locationSettings,
+      ).listen(
+        (Position position) {
+          if (!mounted) return;
 
-              LatLng newPoint = LatLng(position.latitude, position.longitude);
-              setState(() {
-                if (_routePoints.isNotEmpty) {
-                  final Distance distance = const Distance();
-                  _totalDistanceMeters += distance.as(
-                    LengthUnit.Meter,
-                    _routePoints.last,
-                    newPoint,
-                  );
-                }
-                _routePoints.add(newPoint);
-                _currentPosition = newPoint;
-              });
+          LatLng newPoint = LatLng(position.latitude, position.longitude);
+          setState(() {
+            if (_routePoints.isNotEmpty) {
+              final Distance distance = const Distance();
+              _totalDistanceMeters += distance.as(
+                LengthUnit.Meter,
+                _routePoints.last,
+                newPoint,
+              );
+            }
+            _routePoints.add(newPoint);
+            _currentPosition = newPoint;
+          });
 
-              _safeMoveMap(newPoint, 17.0);
-            },
-            onError: (e) {
-              debugPrint('Error tracking stream: $e');
-            },
-          );
+          _safeMoveMap(newPoint, 17.0);
+        },
+        onError: (e) {
+          debugPrint('Error GPS tracking stream: $e');
+        },
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final double runKm = _totalDistanceMeters / 1000;
+    final int estimatedRunDamage = (runKm * 25).round();
+
     return Scaffold(
       backgroundColor: _bgColor,
       appBar: AppBar(
         title: const Text(
-          'LBS GPS Live Tracking',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          'Live Run Tracking',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         backgroundColor: _cardColor,
         elevation: 0,
       ),
-      body: Stack(
-        children: [
-          // Widget OpenStreetMap Gratis (flutter_map)
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _currentPosition,
-              initialZoom: 15.0,
-              onMapReady: () {
-                setState(() {
-                  _isMapReady = true;
-                });
-                _safeMoveMap(_currentPosition, 15.0);
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.geezus.app',
-              ),
-              // PERBAIKAN: Hanya aktif jika ada minimal 2 titik untuk menghindari crash LatLngBounds
-              if (_routePoints.length >= 2)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: List.from(_routePoints),
-                      strokeWidth: 5.0,
-                      color: _primaryColor,
-                    ),
-                  ],
-                ),
-              // Marker Posisi Terkini
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: _currentPosition,
-                    width: 40,
-                    height: 40,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: _primaryColor.withOpacity(0.3),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.my_location,
-                          color: _primaryColor,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          // Overlay Panel Informasi & Kontrol
-          Positioned(
-            bottom: 20,
-            left: 16,
-            right: 16,
-            child: Container(
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Panel Ringkasan Stat Lari
+            Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _cardColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white10),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black45,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
+              color: _cardColor,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildStatItem('JARAK LARI', '${runKm.toStringAsFixed(2)} km', Colors.white),
+                  Container(height: 30, width: 1, color: Colors.white24),
+                  _buildStatItem('EST. DAMAGE', '+$estimatedRunDamage DMG', Colors.amber),
+                  Container(height: 30, width: 1, color: Colors.white24),
+                  _buildStatItem('STATUS', _isTracking ? 'RUNNING' : 'STOPPED', _isTracking ? Colors.greenAccent : Colors.redAccent),
                 ],
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+            ),
+
+            // Tampilan Peta OpenStreetMap
+            Expanded(
+              child: Stack(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: _currentPosition,
+                      initialZoom: 16.0,
+                      onMapReady: () {
+                        setState(() {
+                          _isMapReady = true;
+                        });
+                      },
+                    ),
                     children: [
-                      _buildStatColumn(
-                        'JARAK LARI',
-                        '${(_totalDistanceMeters / 1000).toStringAsFixed(2)} km',
+                      TileLayer(
+                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.geezus.app',
                       ),
-                      Container(height: 30, width: 1, color: Colors.white24),
-                      _buildStatColumn(
-                        'EXP MINGGUAN',
-                        '+${(_totalDistanceMeters * 0.1).round()} EXP',
+                      // Jalur Garis Lari (Polyline)
+                      if (_routePoints.length >= 2)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: _routePoints,
+                              strokeWidth: 5.0,
+                              color: _primaryColor,
+                            ),
+                          ],
+                        ),
+                      // Marker Lokasi Terkini
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: _currentPosition,
+                            width: 40,
+                            height: 40,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: _primaryColor.withOpacity(0.3),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: _primaryColor, width: 3),
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.directions_run_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _isTracking
-                            ? Colors.redAccent
-                            : _primaryColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                      ),
-                      onPressed: _toggleTracking,
-                      icon: Icon(
-                        _isTracking ? Icons.stop : Icons.play_arrow,
-                        color: Colors.white,
-                      ),
-                      label: Text(
-                        _isTracking ? 'STOP TRACKING' : 'START RUNNING',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
+
+                  // Tombol Re-center Peta
+                  Positioned(
+                    right: 16,
+                    bottom: 16,
+                    child: FloatingActionButton.small(
+                      backgroundColor: _cardColor,
+                      child: const Icon(Icons.my_location, color: Colors.white),
+                      onPressed: () => _safeMoveMap(_currentPosition, 17.0),
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+
+            // Tombol Mulai / Selesai Lari
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: _cardColor,
+                border: Border(top: BorderSide(color: Colors.white10)),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isTracking ? Colors.redAccent : _primaryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(26),
+                    ),
+                  ),
+                  onPressed: _toggleTracking,
+                  icon: Icon(
+                    _isTracking ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                    color: Colors.white,
+                  ),
+                  label: Text(
+                    _isTracking ? 'STOP TRACKING & SEND DMG' : 'START RUNNING',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatColumn(String label, String value) {
+  Widget _buildStatItem(String title, String val, Color color) {
     return Column(
       children: [
         Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white54,
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-          ),
+          title,
+          style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
         Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+          val,
+          style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold),
         ),
       ],
     );
