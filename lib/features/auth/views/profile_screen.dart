@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geezus/features/auth/views/login_screen.dart';
-import 'converters_screen.dart';
+import 'converters_screen.dart'; 
 import 'saran_kesan_screen.dart';
-
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -34,7 +33,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _handleLogout(BuildContext context) async {
-    // Hapus sesi aktif
     await _storage.delete(key: 'active_email');
     await _storage.delete(key: 'active_username');
     
@@ -42,11 +40,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       const SnackBar(content: Text('Berhasil Logout!')),
     );
     
-    // KELUAR KE HALAMAN LOGIN
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const LoginScreen()),
-      (route) => false, // Menghapus riwayat halaman sebelumnya agar tidak bisa tombol 'Back'
+      (route) => false,
     );
   }
 
@@ -63,52 +60,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const Center(
-              child: CircleAvatar(
-                radius: 50,
-                backgroundColor: Color(0xFF6C5CE7),
-                child: Icon(Icons.person, size: 50, color: Colors.white),
-              ),
+            const CircleAvatar(
+              radius: 50,
+              backgroundColor: Color(0xFF6C5CE7),
+              child: Icon(Icons.person, size: 60, color: Colors.white),
             ),
-            const SizedBox(height: 16),
-            Text(
-              _username,
-              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _email,
-              style: const TextStyle(color: Colors.grey, fontSize: 14),
-            ),
-            const SizedBox(height: 30),
-
-            // Container Pengaturan
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E2C),
-                borderRadius: BorderRadius.circular(12),
-              ),
+            const SizedBox(height: 12),
+            Text(_username, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(_email, style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 24),
+            Card(
+              color: const Color(0xFF1E1E2C),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.straighten, color: Color(0xFF6C5CE7)),
-                    title: const Text('Distance Unit', style: TextStyle(color: Colors.white)),
-                    trailing: const Text('Miles (mi)', style: TextStyle(color: Colors.grey)),
-                    onTap: () {},
+                  const ListTile(
+                    leading: Icon(Icons.straighten, color: Color(0xFF6C5CE7)),
+                    title: Text('Distance Unit', style: TextStyle(color: Colors.white)),
+                    trailing: Text('Miles (mi)', style: TextStyle(color: Colors.grey)),
                   ),
                   const Divider(height: 1, color: Colors.white24),
-                  ListTile(
-                    leading: const Icon(Icons.currency_exchange, color: Color(0xFF6C5CE7)),
-                    title: const Text('Currency Display', style: TextStyle(color: Colors.white)),
-                    trailing: const Text('IDR (Rp)', style: TextStyle(color: Colors.grey)),
-                    onTap: () {},
+                  const ListTile(
+                    leading: Icon(Icons.currency_exchange, color: Color(0xFF6C5CE7)),
+                    title: Text('Currency Display', style: TextStyle(color: Colors.white)),
+                    trailing: Text('IDR (Rp)', style: TextStyle(color: Colors.grey)),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
-            // Container Menu Tambahan
+            // MENU UTAMA (Tombol navigasi ke Modul Konversi & Zona Waktu)
             Container(
               decoration: BoxDecoration(
                 color: const Color(0xFF1E1E2C),

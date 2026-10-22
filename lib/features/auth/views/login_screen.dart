@@ -267,7 +267,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Icon(Icons.fingerprint, color: Color(0xFF6C5CE7)),
                       SizedBox(width: 8),
                       Text(
-                        'Login with Biometrics',
+                        'Login with Biometrics / Sidik Jari',
                         style: TextStyle(color: Colors.white, fontSize: 16),
                       ),
                     ],

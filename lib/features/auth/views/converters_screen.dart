@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart'; 
 
 class ConvertersScreen extends StatefulWidget {
   const ConvertersScreen({super.key});
@@ -11,27 +10,25 @@ class ConvertersScreen extends StatefulWidget {
 }
 
 class _ConvertersScreenState extends State<ConvertersScreen> {
-  final TextEditingController _amountController = TextEditingController(text: '100.000');
-  String _selectedCurrency = 'USD';
-  String _conversionResult = '';
+  // Controller dengan teks awal terformat
+  final TextEditingController _idrController = TextEditingController(text: '100.000');
   
-  // Timer untuk zona waktu real-time
+  String _selectedCurrency = 'USD';
+  double _result = 6.45;
+
+  // Kurs konversi (Contoh asumsi nilai tukar terhadap IDR)
+  final Map<String, double> _rates = {
+    'USD': 0.0000645, // 1 IDR ke USD
+    'EUR': 0.0000590, // 1 IDR ke EUR
+    'SGD': 0.0000860, // 1 IDR ke SGD
+  };
+
   late Timer _timer;
   DateTime _currentTime = DateTime.now();
-
-  // Kurs asumsi terhadap IDR (Rupiah)
-  final Map<String, double> _exchangeRates = {
-    'USD': 15500.0, // 1 USD = Rp 15.500
-    'EUR': 16800.0, // 1 EUR = Rp 16.800
-    'SGD': 11500.0, // 1 SGD = Rp 11.500
-  };
 
   @override
   void initState() {
     super.initState();
-    _calculateConversion('100000');
-    
-    // Jalankan timer untuk memperbarui detik jam global setiap 1 detik
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
@@ -44,44 +41,69 @@ class _ConvertersScreenState extends State<ConvertersScreen> {
   @override
   void dispose() {
     _timer.cancel();
-    _amountController.dispose();
+    _idrController.dispose();
     super.dispose();
   }
 
-  void _calculateConversion(String rawValue) {
-    // Hilangkan semua titik agar bisa dibaca sebagai angka mentah
-    String cleanValue = rawValue.replaceAll('.', '');
-    double inputIdr = double.tryParse(cleanValue) ?? 0.0;
-    double rate = _exchangeRates[_selectedCurrency] ?? 15500.0;
+  // Fungsi untuk memformat angka dengan titik otomatis saat diketik
+  void _onIdrChanged(String value) {
+    // Hapus semua karakter selain angka
+    String cleanValue = value.replaceAll(RegExp(r'[^0-9]'), '');
     
-    double result = inputIdr / rate;
+    if (cleanValue.isEmpty) {
+      _idrController.text = '';
+      _idrController.selection = const TextSelection.collapsed(offset: 0);
+      setState(() {
+        _result = 0.0;
+      });
+      return;
+    }
 
+    double parsedValue = double.parse(cleanValue);
+    
+    // Format angka menggunakan pemisah titik ala Indonesia
+    final formatter = NumberFormat('#,###', 'id_ID');
+    String formatted = formatter.format(parsedValue).replaceAll(',', '.');
+
+    _idrController.value = TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+
+    // Hitung hasil konversi
     setState(() {
-      _conversionResult = '${result.toStringAsFixed(2)} $_selectedCurrency';
+      _result = parsedValue * (_rates[_selectedCurrency] ?? 0.0000645);
     });
   }
 
-  // Fungsi untuk memformat angka dengan pemisah titik otomatis (contoh: 100.000)
-  String _formatNumber(String string) {
-    if (string.isEmpty) return '';
-    string = string.replaceAll('.', '');
-    if (double.tryParse(string) == null) return string;
-    final formatter = NumberFormat('#,###', 'id_ID');
-    return formatter.format(double.parse(string)).replaceAll(',', '.');
-  }
-
-  // Fungsi untuk menampilkan jam berdasarkan zona waktu tertentu
-  String _getTimeForOffset(int hoursOffset) {
-    DateTime targetTime = _currentTime.toUtc().add(Duration(hours: hoursOffset));
-    return DateFormat('HH:mm:ss').format(targetTime);
+  void _onCurrencyChanged(String? newCurrency) {
+    if (newCurrency != null) {
+      setState(() {
+        _selectedCurrency = newCurrency;
+        // Hitung ulang berdasarkan nilai saat ini
+        String cleanValue = _idrController.text.replaceAll(RegExp(r'[^0-9]'), '');
+        double parsedValue = double.tryParse(cleanValue) ?? 0;
+        _result = parsedValue * (_rates[_selectedCurrency] ?? 0.0000645);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    DateTime utcTime = _currentTime.toUtc();
+    DateTime wibTime = utcTime.add(const Duration(hours: 7));
+    DateTime witaTime = utcTime.add(const Duration(hours: 8));
+    DateTime witTime = utcTime.add(const Duration(hours: 9));
+    DateTime londonTime = utcTime;
+
+    String formatDigits(int n) => n.toString().padLeft(2, '0');
+    String getTimeString(DateTime dt) => 
+        '${formatDigits(dt.hour)}:${formatDigits(dt.minute)}:${formatDigits(dt.second)}';
+
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        title: const Text('Modul Konversi & Zona Waktu', style: TextStyle(color: Colors.white)),
+        title: const Text('Modul Konversi & Zona Waktu', style: TextStyle(color: Colors.white, fontSize: 18)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -91,10 +113,9 @@ class _ConvertersScreenState extends State<ConvertersScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Bagian Konversi Mata Uang
             const Text(
               'Konversi Poin Reward (IDR ke Valuta Asing)',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 12),
             Container(
@@ -104,81 +125,81 @@ class _ConvertersScreenState extends State<ConvertersScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Text('Jumlah dalam IDR (Rp)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  const SizedBox(height: 6),
+                  
+                  // Input Nominal dengan Format Titik Otomatis
                   TextField(
-                    controller: _amountController,
+                    controller: _idrController,
                     keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     style: const TextStyle(color: Colors.white),
+                    onChanged: _onIdrChanged,
                     decoration: InputDecoration(
-                      labelText: 'Jumlah dalam IDR (Rp)',
-                      labelStyle: const TextStyle(color: Colors.grey),
                       filled: true,
-                      fillColor: const Color(0xFF121212),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    onChanged: (val) {
-                      if (val.isNotEmpty) {
-                        String formatted = _formatNumber(val);
-                        _amountController.value = TextEditingValue(
-                          text: formatted,
-                          selection: TextSelection.collapsed(offset: formatted.length),
-                        );
-                        _calculateConversion(formatted);
-                      } else {
-                        _calculateConversion('0');
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: _selectedCurrency,
-                          dropdownColor: const Color(0xFF1E1E2C),
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: const Color(0xFF121212),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          items: ['USD', 'EUR', 'SGD'].map((currency) {
-                            return DropdownMenuItem(value: currency, child: Text(currency));
-                          }).toList(),
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedCurrency = val!;
-                              _calculateConversion(_amountController.text);
-                            });
-                          },
-                        ),
+                      fillColor: Colors.black26,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
                       ),
-                    ],
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+
+                  // Dropdown Pilihan Valuta Asing (USD, EUR, SGD)
                   Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF121212),
+                      color: Colors.black26,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      'Hasil: $_conversionResult',
-                      style: const TextStyle(color: Color(0xFF00E676), fontSize: 18, fontWeight: FontWeight.bold),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedCurrency,
+                        dropdownColor: const Color(0xFF1E1E2C),
+                        icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        items: ['USD', 'EUR', 'SGD'].map((String currency) {
+                          return DropdownMenuItem<String>(
+                            value: currency,
+                            child: Text(currency),
+                          );
+                        }).toList(),
+                        onChanged: _onCurrencyChanged,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Kotak Hasil Konversi
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black38,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Hasil:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        Text(
+                          '${_result.toStringAsFixed(2)} $_selectedCurrency',
+                          style: const TextStyle(color: Color(0xFF00E676), fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 30),
 
-            const SizedBox(height: 32),
-
-            // Bagian Zona Waktu Global (Real-time detik berjalan)
+            // ZONA WAKTU GLOBAL MARATHON (REAL-TIME)
             const Text(
               'Zona Waktu Global Marathon',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 12),
             Container(
@@ -188,28 +209,30 @@ class _ConvertersScreenState extends State<ConvertersScreen> {
               ),
               child: Column(
                 children: [
-                  _buildTimeZoneTile('WIB (Jakarta)', 7),
+                  ListTile(
+                    title: const Text('WIB (Jakarta)', style: TextStyle(color: Colors.white)),
+                    trailing: Text(getTimeString(wibTime), style: const TextStyle(color: Color(0xFF9C88FF), fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
                   const Divider(height: 1, color: Colors.white24),
-                  _buildTimeZoneTile('WITA (Makassar)', 8),
+                  ListTile(
+                    title: const Text('WITA (Makassar)', style: TextStyle(color: Colors.white)),
+                    trailing: Text(getTimeString(witaTime), style: const TextStyle(color: Color(0xFF9C88FF), fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
                   const Divider(height: 1, color: Colors.white24),
-                  _buildTimeZoneTile('WIT (Jayapura)', 9),
+                  ListTile(
+                    title: const Text('WIT (Jayapura)', style: TextStyle(color: Colors.white)),
+                    trailing: Text(getTimeString(witTime), style: const TextStyle(color: Color(0xFF9C88FF), fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
                   const Divider(height: 1, color: Colors.white24),
-                  _buildTimeZoneTile('London (UTC)', 0),
+                  ListTile(
+                    title: const Text('London (UTC)', style: TextStyle(color: Colors.white)),
+                    trailing: Text(getTimeString(londonTime), style: const TextStyle(color: Color(0xFF9C88FF), fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildTimeZoneTile(String title, int offsetHours) {
-    return ListTile(
-      title: Text(title, style: const TextStyle(color: Colors.white)),
-      trailing: Text(
-        _getTimeForOffset(offsetHours),
-        style: const TextStyle(color: Color(0xFF6C5CE7), fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
       ),
     );
   }
