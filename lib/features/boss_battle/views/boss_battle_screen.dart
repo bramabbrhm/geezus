@@ -87,7 +87,7 @@ class _BossBattleScreenState extends State<BossBattleScreen>
   late int _bossMaxHp;
   late int _bossCurrentHp;
 
-  int _playerMaxHp = 1000;
+  final int _playerMaxHp = 1000;
   int _playerCurrentHp = 1000;
 
   bool _isAttacking = false;
@@ -223,7 +223,7 @@ class _BossBattleScreenState extends State<BossBattleScreen>
       _battleLog.clear();
       _battleLog.insert(
         0,
-        '⚡ BOSS BARU MUNCUL: $_currentBossName (Lvl $_bossLevel) dengan HP ${_bossMaxHp}!',
+        '⚡ BOSS BARU MUNCUL: $_currentBossName (Lvl $_bossLevel) dengan HP $_bossMaxHp!',
       );
     });
   }
@@ -262,7 +262,7 @@ class _BossBattleScreenState extends State<BossBattleScreen>
                 margin: const EdgeInsets.only(right: 16),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _primaryColor.withOpacity(0.2),
+                  color: _primaryColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: _primaryColor),
                 ),
@@ -332,7 +332,7 @@ class _BossBattleScreenState extends State<BossBattleScreen>
                         color: _cardColor,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: _currentBossColor.withOpacity(0.5),
+                          color: _currentBossColor.withValues(alpha: 0.5),
                           width: 2,
                         ),
                       ),
@@ -507,7 +507,7 @@ class _BossBattleScreenState extends State<BossBattleScreen>
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: _primaryColor.withOpacity(0.2),
+                                  color: _primaryColor.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: _primaryColor),
                                 ),

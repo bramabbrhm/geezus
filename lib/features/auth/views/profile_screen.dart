@@ -37,7 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _storage.delete(key: 'active_email');
     await _storage.delete(key: 'active_username');
     
-    if (!mounted) return;
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Berhasil Logout!')),
     );

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -62,7 +61,7 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
     // Dapatkan posisi terkini untuk center peta
     try {
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
       if (mounted) {
         setState(() {
@@ -224,7 +223,7 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
                             height: 40,
                             child: Container(
                               decoration: BoxDecoration(
-                                color: _primaryColor.withOpacity(0.3),
+                                color: _primaryColor.withValues(alpha: 0.3),
                                 shape: BoxShape.circle,
                                 border: Border.all(color: _primaryColor, width: 3),
                               ),

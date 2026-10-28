@@ -9,7 +9,10 @@ import '../models/chat_message_model.dart';
 /// Dilengkapi penanganan timeout eksplisit dan loading state otomatis
 class AiCoachController extends ChangeNotifier {
   /// Konstanta API Key Gemini resmi pengguna
-  static const String apiKey = 'AQ.Ab8RN6LAaKwSZ-wKeXOsBXCmJGlWtFO60G_19aZgPDihxzaayw';
+ static const String apiKey = String.fromEnvironment(
+  'GEMINI_API_KEY', 
+  defaultValue: 'YOUR_GEMINI_API_KEY_HERE',
+);
 
   /// Model preferensi yang tersimpan lintas instance untuk respon instan
   static String _preferredModelName = 'gemini-1.5-flash';

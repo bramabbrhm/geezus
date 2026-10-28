@@ -36,7 +36,7 @@ class _RootNavigationState extends State<RootNavigation> {
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
           backgroundColor: _cardColor,
-          indicatorColor: _primaryColor.withOpacity(0.3),
+          indicatorColor: _primaryColor.withValues(alpha: 0.3),
           labelTextStyle: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
               return const TextStyle(
