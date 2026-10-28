@@ -48,6 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     // Jika ada akun lain yang aktif DAN akun tersebut bukan akun yang sedang mencoba login
     if (currentActiveEmail != null && currentActiveEmail != targetEmail) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Akun $currentActiveEmail masih aktif! Harap Logout terlebih dahulu.'),
@@ -58,6 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     // -------------------------------------
 
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     String? matchedEmail;
@@ -75,6 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (matchedEmail == null) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login Gagal: Akun tidak ditemukan! Silakan Register.')),
@@ -99,6 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // Tandai biometrik aktif untuk perangkat ini
       await _storage.write(key: 'biometric_enabled', value: 'true');
 
+      if (!mounted) return;
       setState(() => _isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -111,6 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (context) => const RootNavigation()), 
       );
     } else {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login Gagal: Password salah!')),
@@ -125,6 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
       bool isDeviceSupported = await _auth.isDeviceSupported();
 
       if (!canCheckBiometrics || !isDeviceSupported) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Perangkat tidak Mendukung Biometrik!')),
         );
@@ -142,6 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (authenticated) {
         // Cek apakah ada sesi akun yang pernah aktif sebelumnya di perangkat ini
         String? activeEmail = await _storage.read(key: 'active_email');
+        if (!mounted) return;
         if (activeEmail != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Autentikasi Biometrik Berhasil!')),
@@ -159,6 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal Biometrik: $e')),
       );

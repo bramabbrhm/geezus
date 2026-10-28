@@ -59,7 +59,13 @@ class _ConvertersScreenState extends State<ConvertersScreen> {
       return;
     }
 
-    double parsedValue = double.parse(cleanValue);
+    final double? parsedValue = double.tryParse(cleanValue);
+    if (parsedValue == null) {
+      setState(() {
+        _result = 0.0;
+      });
+      return;
+    }
     
     // Format angka menggunakan pemisah titik ala Indonesia
     final formatter = NumberFormat('#,###', 'id_ID');

@@ -49,6 +49,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     await _storage.write(key: 'active_email', value: email);
     await _storage.write(key: 'active_username', value: username);
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -185,4 +186,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
+}
+
 }

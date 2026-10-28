@@ -26,6 +26,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String? savedUsername = await _storage.read(key: 'active_username');
     String? savedEmail = await _storage.read(key: 'active_email');
 
+    if (!mounted) return;
     setState(() {
       if (savedUsername != null) _username = savedUsername;
       if (savedEmail != null) _email = savedEmail;
@@ -36,6 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _storage.delete(key: 'active_email');
     await _storage.delete(key: 'active_username');
     
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Berhasil Logout!')),
     );
