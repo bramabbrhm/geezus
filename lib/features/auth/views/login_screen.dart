@@ -1,9 +1,8 @@
-import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geezus/shared/root_navigation.dart';
 import 'package:local_auth/local_auth.dart';
+import '../controllers/auth_controller.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -14,14 +13,14 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _identifierController = TextEditingController(); // Bisa Email atau Username
+  final _identifierController = TextEditingController(); // Email atau Username
   final _passwordController = TextEditingController();
   
   final _storage = const FlutterSecureStorage();
   final LocalAuthentication _auth = LocalAuthentication();
   bool _isLoading = false;
 
-  // Fungsi Login Manual dengan Validasi Email/Username & SHA-256 yang Akurat
+  // Fungsi Login dengan Validasi Email/Username via AuthController (Supabase & Fallback Lokal)
   Future<void> _handleLogin() async {
     final identifier = _identifierController.text.trim();
     final password = _passwordController.text.trim();
@@ -33,97 +32,39 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // --- VALIDASI PENCEGAHAN TIMPA AKUN ---
-    // Cek apakah sudah ada sesi akun lain yang sedang aktif di perangkat ini
-    String? currentActiveEmail = await _storage.read(key: 'active_email');
-    
-    // Tentukan target email dari input identifier (bisa email langsung atau dari username)
-    String? targetEmail;
-    String? directPasswordHash = await _storage.read(key: 'reg_password_$identifier');
-    if (directPasswordHash != null) {
-      targetEmail = identifier;
-    } else {
-      targetEmail = await _storage.read(key: 'username_to_email_$identifier');
-    }
-
-    // Jika ada akun lain yang aktif DAN akun tersebut bukan akun yang sedang mencoba login
-    if (currentActiveEmail != null && currentActiveEmail != targetEmail) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Akun $currentActiveEmail masih aktif! Harap Logout terlebih dahulu.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return; // Batalkan proses login agar sesi lama tidak tertimpa
-    }
-    // -------------------------------------
-
-    if (!mounted) return;
     setState(() => _isLoading = true);
 
-    String? matchedEmail;
-    
-    // 1. Cek langsung jika input adalah Email yang terdaftar
-    String? storedDirectHash = await _storage.read(key: 'reg_password_$identifier');
-    if (storedDirectHash != null) {
-      matchedEmail = identifier;
-    } else {
-      // 2. Jika bukan email, cek apakah input adalah Username menggunakan pemetaan kunci penghubung
-      String? mappedEmailFromUsername = await _storage.read(key: 'username_to_email_$identifier');
-      if (mappedEmailFromUsername != null) {
-        matchedEmail = mappedEmailFromUsername;
-      }
-    }
+    final success = await AuthController.instance.signIn(
+      identifier: identifier,
+      password: password,
+    );
 
-    if (matchedEmail == null) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login Gagal: Akun tidak ditemukan! Silakan Register.')),
-      );
-      return;
-    }
+    if (!mounted) return;
+    setState(() => _isLoading = false);
 
-    String? storedPasswordHash = await _storage.read(key: 'reg_password_$matchedEmail');
-
-    // Enkripsi input password dengan SHA-256 untuk dicocokkan
-    var bytes = utf8.encode(password);
-    var inputPasswordHash = sha256.convert(bytes).toString();
-
-    if (inputPasswordHash == storedPasswordHash) {
-      // Simpan sesi aktif
-      await _storage.write(key: 'active_email', value: matchedEmail);
-      String? username = await _storage.read(key: 'reg_username_$matchedEmail');
-      if (username != null) {
-        await _storage.write(key: 'active_username', value: username);
-      }
-      
-      // Tandai biometrik aktif untuk perangkat ini
+    if (success) {
       await _storage.write(key: 'biometric_enabled', value: 'true');
-
-      if (!mounted) return;
-      setState(() => _isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login Berhasil! Selamat datang.')),
       );
 
-      // LANGSUNG MASUK KE HALAMAN UTAMA 
+      // Masuk ke Halaman Utama
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const RootNavigation()), 
+        MaterialPageRoute(builder: (context) => const RootNavigation()),
       );
     } else {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login Gagal: Password salah!')),
+        SnackBar(
+          content: Text(AuthController.instance.errorMessage ?? 'Login Gagal: Akun tidak cocok!'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
-  // Fungsi Login Biometrik (Sidik Jari) yang Langsung Masuk
+  // Fungsi Login Biometrik (Sidik Jari)
   Future<void> _handleBiometricLogin() async {
     try {
       bool canCheckBiometrics = await _auth.canCheckBiometrics;
@@ -146,7 +87,6 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (authenticated) {
-        // Cek apakah ada sesi akun yang pernah aktif sebelumnya di perangkat ini
         String? activeEmail = await _storage.read(key: 'active_email');
         if (!mounted) return;
         if (activeEmail != null) {
@@ -154,7 +94,6 @@ class _LoginScreenState extends State<LoginScreen> {
             const SnackBar(content: Text('Autentikasi Biometrik Berhasil!')),
           );
 
-          // LANGSUNG MASUK KE HALAMAN UTAMA OTOMATIS
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const RootNavigation()),
@@ -259,43 +198,43 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Tombol Login dengan Biometrik (Sidik Jari)
+              // Tombol Login Biometrik
               SizedBox(
                 width: double.infinity,
                 height: 50,
-                child: OutlinedButton(
+                child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF6C5CE7)),
+                    side: const BorderSide(color: Color(0xFF6C5CE7), width: 1.5),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: _handleBiometricLogin,
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.fingerprint, color: Color(0xFF6C5CE7)),
-                      SizedBox(width: 8),
-                      Text(
-                        'Login with Biometrics / Sidik Jari',
-                        style: TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                    ],
+                  onPressed: _isLoading ? null : _handleBiometricLogin,
+                  icon: const Icon(Icons.fingerprint, color: Color(0xFF6C5CE7)),
+                  label: const Text(
+                    'Login dengan Biometrik',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
-              // Tautan ke Halaman Register
-              TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const RegisterScreen()),
-                  );
-                },
-                child: const Text(
-                  'Belum punya akun? Register di sini',
-                  style: TextStyle(color: Color(0xFF6C5CE7)),
-                ),
+              // Tombol Pindah ke Halaman Registrasi
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Belum punya akun? ', style: TextStyle(color: Colors.grey)),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                      );
+                    },
+                    child: const Text(
+                      'Daftar Sekarang',
+                      style: TextStyle(color: Color(0xFF6C5CE7), fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

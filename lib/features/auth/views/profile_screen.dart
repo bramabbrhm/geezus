@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../controllers/auth_controller.dart';
 import 'package:geezus/features/auth/views/login_screen.dart';
 import 'converters_screen.dart'; 
 import 'saran_kesan_screen.dart';
@@ -34,8 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _handleLogout(BuildContext context) async {
-    await _storage.delete(key: 'active_email');
-    await _storage.delete(key: 'active_username');
+    await AuthController.instance.signOut();
     
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

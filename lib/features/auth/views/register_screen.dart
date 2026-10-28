@@ -1,7 +1,5 @@
-import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../controllers/auth_controller.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -16,7 +14,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   
-  final _storage = const FlutterSecureStorage();
   bool _isLoading = false;
 
   Future<void> _handleRegister() async {
@@ -34,30 +31,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isLoading = true);
 
-    // Enkripsi password dengan SHA-256
-    var bytes = utf8.encode(password);
-    var hashedPassword = sha256.convert(bytes).toString();
-
-    // Simpan data lengkap ke Secure Storage
-    await _storage.write(key: 'reg_username_$email', value: username);
-    await _storage.write(key: 'reg_phone_$email', value: phone);
-    await _storage.write(key: 'reg_password_$email', value: hashedPassword);
-    await _storage.write(key: 'username_to_email_$username', value: email);
-    await _storage.write(key: 'last_registered_email', value: email);
-    
-    // Simpan sesi aktif sementara
-    await _storage.write(key: 'active_email', value: email);
-    await _storage.write(key: 'active_username', value: username);
+    final success = await AuthController.instance.signUp(
+      email: email,
+      password: password,
+      username: username,
+      phone: phone,
+    );
 
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Registrasi Berhasil! Selamat datang di Geezus.')),
-    );
-
-    // Kembali ke halaman sebelumnya atau masuk ke aplikasi utama
-    Navigator.pop(context);
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Registrasi Berhasil! Silakan Login.')),
+      );
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AuthController.instance.errorMessage ?? 'Gagal mendaftar')),
+      );
+    }
   }
 
   @override
@@ -74,18 +67,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
+        title: const Text('Buat Akun Baru', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: SafeArea(
+      body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Text(
-                'Buat Akun Geezus',
+                'Daftar Geezus',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 28,
@@ -94,12 +87,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Lengkapi data dirimu untuk memulai petualangan fitness.',
+                'Mulai perjalanan gamified fitness Anda sekarang',
                 style: TextStyle(color: Colors.grey, fontSize: 14),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-              
-              // Input Username
+
+              // Field Username
               TextField(
                 controller: _usernameController,
                 style: const TextStyle(color: Colors.white),
@@ -114,7 +108,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Input Email
+              // Field Email
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -130,7 +124,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Input Nomor Telepon
+              // Field Nomor Telepon
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
@@ -146,7 +140,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Input Password
+              // Field Password
               TextField(
                 controller: _passwordController,
                 obscureText: true,
