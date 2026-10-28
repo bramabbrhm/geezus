@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../features/tracking/views/live_run_screen.dart';
 import '../features/boss_battle/views/boss_battle_screen.dart';
 import '../features/ai_coach/views/ai_coach_screen.dart';
+import '../features/web3_nft/views/badges_screen.dart';
 import '../features/auth/views/profile_screen.dart';
 
 class RootNavigation extends StatefulWidget {
@@ -19,9 +20,10 @@ class _RootNavigationState extends State<RootNavigation> {
   static const Color _bgColor = Color(0xFF121212);
 
   final List<Widget> _screens = const [
-    AiCoachScreen(),
-    BossBattleScreen(),
     LiveRunScreen(),
+    BossBattleScreen(),
+    AiCoachScreen(),
+    BadgesScreen(),
     ProfileScreen(),
   ];
 
@@ -57,24 +59,29 @@ class _RootNavigationState extends State<RootNavigation> {
           },
           destinations: const [
             NavigationDestination(
+              icon: Icon(Icons.directions_run_outlined, color: Colors.white54),
+              selectedIcon: Icon(Icons.directions_run_rounded, color: _primaryColor),
+              label: 'Run',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.shield_outlined, color: Colors.white54),
+              selectedIcon: Icon(Icons.shield, color: _primaryColor),
+              label: 'Boss',
+            ),
+            NavigationDestination(
               icon: Icon(Icons.smart_toy_outlined, color: Colors.white54),
               selectedIcon: Icon(Icons.smart_toy_rounded, color: _primaryColor),
               label: 'AI Coach',
             ),
             NavigationDestination(
-              icon: Icon(Icons.shield_outlined, color: Colors.white54),
-              selectedIcon: Icon(Icons.shield, color: _primaryColor),
-              label: 'Dungeon',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.map_outlined, color: Colors.white54),
-              selectedIcon: Icon(Icons.map_rounded, color: _primaryColor),
-              label: 'Tracking',
+              icon: Icon(Icons.emoji_events_outlined, color: Colors.white54),
+              selectedIcon: Icon(Icons.emoji_events, color: _primaryColor),
+              label: 'Badge',
             ),
             NavigationDestination(
               icon: Icon(Icons.person_outline, color: Colors.white54),
               selectedIcon: Icon(Icons.person, color: _primaryColor),
-              label: 'Profil',
+              label: 'Profile',
             ),
           ],
         ),

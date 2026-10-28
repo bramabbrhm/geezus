@@ -42,23 +42,70 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
     super.dispose();
   }
 
-  // Cek dan Minta Izin GPS
+    // Cek dan Minta Izin GPS
   Future<void> _checkLocationPermission() async {
     bool serviceEnabled;
     LocationPermission permission;
 
+    // 1. Cek Service GPS
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
+    if (!serviceEnabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: _cardColor,
+            content: const Text(
+              'Layanan GPS nonaktif. Harap aktifkan GPS untuk tracking.',
+              style: TextStyle(color: Colors.white),
+            ),
+            action: SnackBarAction(
+              label: 'Buka GPS',
+              textColor: _primaryColor,
+              onPressed: () => Geolocator.openLocationSettings(),
+            ),
+          ),
+        );
+      }
+      return;
+    }
 
+    // 2. Cek Status Izin Lokasi
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
+      if (permission == LocationPermission.denied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Izin akses lokasi ditolak.'),
+            ),
+          );
+        }
+        return;
+      }
     }
 
-    if (permission == LocationPermission.deniedForever) return;
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: _cardColor,
+            content: const Text(
+              'Izin lokasi ditolak permanen. Buka pengaturan aplikasi untuk mengizinkan.',
+              style: TextStyle(color: Colors.white),
+            ),
+            action: SnackBarAction(
+              label: 'Pengaturan',
+              textColor: _primaryColor,
+              onPressed: () => Geolocator.openAppSettings(),
+            ),
+          ),
+        );
+      }
+      return;
+    }
 
-    // Dapatkan posisi terkini untuk center peta
+    // 3. Izin Granted -> Ambil koordinat fisik & Center kamera
     try {
       Position position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
@@ -196,6 +243,7 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
                         setState(() {
                           _isMapReady = true;
                         });
+                        _safeMoveMap(_currentPosition, 16.0);
                       },
                     ),
                     children: [

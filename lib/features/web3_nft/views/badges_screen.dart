@@ -71,7 +71,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
-                'NFT Berhasil Di-Mint!',
+                'Badge Berhasil Diklaim!',
                 style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
@@ -197,7 +197,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
       backgroundColor: _bgColor,
       appBar: AppBar(
         title: const Text(
-          'Web3 NFT Medals',
+          'Pencapaian Badge',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: _cardColor,
@@ -298,7 +298,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Total Medal Ter-Mint: ${_controller.mintedCount} / ${_controller.badges.length}',
+                        'Total Badge Terklaim: ${_controller.mintedCount} / ${_controller.badges.length}',
                         style: const TextStyle(
                           color: Colors.amberAccent,
                           fontSize: 12,
@@ -326,7 +326,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'Capai milestone latihan gym dan lari untuk mencetak (mint) NFT Medal permanen di Polygon blockchain.',
+              'Capai milestone latihan gym dan lari untuk membuka dan mengklaim Badge prestasi Anda.',
               style: TextStyle(color: Colors.white54, fontSize: 12),
             ),
             const SizedBox(height: 16),
@@ -421,8 +421,8 @@ class _BadgesScreenState extends State<BadgesScreen> {
                           ),
                           child: Text(
                             badge.isMinted
-                                ? 'MINTED'
-                                : (badge.isUnlocked ? 'READY TO MINT' : 'LOCKED'),
+                                ? 'TERKLAIM'
+                                : (badge.isUnlocked ? 'SIAP KLAIM' : 'TERKUNCI'),
                             style: TextStyle(
                               color: badge.isMinted
                                   ? Colors.greenAccent
@@ -489,7 +489,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text('Detail NFT', style: TextStyle(color: Colors.amberAccent, fontSize: 12)),
+                  child: const Text('Detail Badge', style: TextStyle(color: Colors.amberAccent, fontSize: 12)),
                 ),
               ],
             ),
@@ -517,7 +517,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
                         )
                       : const Icon(Icons.token_rounded, color: Colors.white, size: 16),
                   label: Text(
-                    isMintingThis ? 'Minting...' : 'Mint NFT',
+                    isMintingThis ? 'Mengklaim...' : 'Klaim Badge',
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                 ),

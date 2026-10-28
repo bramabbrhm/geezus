@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../../../core/services/gym_store.dart';
 import '../models/chat_message_model.dart';
@@ -8,21 +9,36 @@ import '../models/chat_message_model.dart';
 /// Menggabungkan pemrosesan lokal log gym (ke GymStore) dan fallback ke Google Gemini API
 /// Dilengkapi penanganan timeout eksplisit dan loading state otomatis
 class AiCoachController extends ChangeNotifier {
-  /// Konstanta API Key Gemini resmi pengguna
- static const String apiKey = String.fromEnvironment(
-  'GEMINI_API_KEY', 
-  defaultValue: 'YOUR_GEMINI_API_KEY_HERE',
-);
+  /// Robust Fallback API Key:
+  /// Membaca dari .env lokal, jika belum di-load/kosong, fallback ke --dart-define
+  static String get apiKey {
+    try {
+      if (dotenv.isInitialized) {
+        final envKey = dotenv.env['GEMINI_API_KEY'];
+        if (envKey != null && envKey.trim().isNotEmpty) {
+          return envKey.trim();
+        }
+      }
+    } catch (_) {}
+    return const String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
+  }
+
+  /// Helper untuk mengecek apakah API Key valid
+  static bool get isApiKeyConfigured {
+    final key = apiKey;
+    return key.isNotEmpty &&
+        key != 'YOUR_GEMINI_API_KEY_HERE' &&
+        !key.startsWith('YOUR_');
+  }
 
   /// Model preferensi yang tersimpan lintas instance untuk respon instan
-  static String _preferredModelName = 'gemini-1.5-flash';
+  static String _preferredModelName = 'gemini-2.5-flash';
 
-  /// Urutan kandidat model Gemini (mengutamakan model cepat 1.5-flash & 2.0-flash, dengan fallback ke flash-latest & 3.8-flash)
   static const List<String> _candidateModels = [
-    'gemini-1.5-flash',
-    'gemini-2.0-flash',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-3-flash',
     'gemini-flash-latest',
-    'gemini-3.8-flash',
   ];
 
   String _activeModelName = _preferredModelName;
@@ -36,14 +52,6 @@ class AiCoachController extends ChangeNotifier {
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   bool get isLoading => _isLoading;
   String get activeModelName => _activeModelName;
-
-  /// Helper untuk mengecek apakah API Key sudah diisi nilai valid
-  static bool get isApiKeyConfigured {
-    final trimmed = apiKey.trim();
-    return trimmed.isNotEmpty &&
-        trimmed != 'YOUR_GEMINI_API_KEY_HERE' &&
-        !trimmed.startsWith('YOUR_');
-  }
 
   AiCoachController() {
     _initGemini(_activeModelName);
@@ -64,7 +72,10 @@ class AiCoachController extends ChangeNotifier {
         model: modelName,
         apiKey: apiKey,
         systemInstruction: Content.system(
-          'Kamu adalah Geezus AI Coach, asisten kebugaran, gym, nutrisi, dan lari yang profesional dan ramah. Jawablah pertanyaan user dengan singkat, padat, dan motivatif.',
+          'Kamu adalah Geezus AI Coach, asisten kebugaran, gym, lari, dan nutrisi olahraga yang profesional dan ramah. '
+          'ATURAN UTAMA: Kamu HANYA boleh menjawab pertanyaan seputar kebugaran, latihan gym, teknik lari, nutrisi olahraga, hidrasi, dan pemulihan otot (recovery). '
+          'Jika pengguna bertanya tentang topik di luar bidang ini (seperti politik, pemrograman, matematika, hiburan, atau sejarah), tolak secara ramah dengan: '
+          '"Maaf bro! Sebagai Geezus AI Coach, aku cuma bisa bantu jawab seputar latihan gym, lari, nutrisi, dan recovery otot. Yuk fokus ke target fitnessmu hari ini! 🏋️‍♂️🏃‍♂️"'
         ),
       );
       _chatSession = _model!.startChat();
@@ -232,14 +243,14 @@ class AiCoachController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Kirim pesan pengguna ke Google Gemini API secara aman dengan batas waktu eksplisit 10 detik
+  /// Kirim pesan pengguna ke Google Gemini API secara aman dengan batas waktu eksplisit 15 detik
   Future<void> _sendToGemini(String input) async {
     // 1. Cek apakah API Key belum dikonfigurasi
     if (!isApiKeyConfigured) {
       _messages.add(
         ChatMessage(
           text: '🤖 *Geezus AI Coach*\n\n'
-              'API Key Gemini belum disetel. Silakan masukkan Google Gemini API Key Anda pada variabel `apiKey` di `lib/features/ai_coach/controllers/ai_coach_controller.dart` agar saya dapat menjawab pertanyaan bebas di luar log latihan.\n\n'
+              'API Key Gemini belum disetel. Silakan masukkan Google Gemini API Key Anda pada file `.env` atau variabel `apiKey` di `lib/features/ai_coach/controllers/ai_coach_controller.dart` agar saya dapat menjawab pertanyaan bebas di luar log latihan.\n\n'
               '💡 *Tips:* Anda tetap bisa mencatat latihan gym secara lokal, contoh: *"Bench Press 40kg 3 set 10 rep"*.',
           isUser: false,
           time: _getCurrentTime(),
@@ -254,9 +265,9 @@ class AiCoachController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Jalankan query dengan batas waktu eksplisit 10 detik
+      // Jalankan query dengan batas waktu eksplisit 15 detik
       final String? responseText = await _sendMessageWithFallback(input)
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 15));
 
       if (responseText != null && responseText.isNotEmpty) {
         _messages.add(
@@ -277,7 +288,7 @@ class AiCoachController extends ChangeNotifier {
         );
       }
     } on TimeoutException {
-      debugPrint('Gemini API request timed out (>10 detik)');
+      debugPrint('Gemini API request timed out (>15 detik)');
       // Pesan khusus ramah saat terjadi timeout sesuai instruksi
       _messages.add(
         ChatMessage(
@@ -305,7 +316,7 @@ class AiCoachController extends ChangeNotifier {
   }
 
   /// Mencoba mengirim pesan ke model aktif atau beralih ke model cadangan jika model versi lama tidak ditemukan
-  /// Setiap kandidat dibatasi timeout maksimal 5 detik agar total waktu tunggu tidak melebihi 10 detik
+  /// Setiap kandidat dibatasi timeout maksimal 8 detik agar total waktu tunggu tidak melebihi 15 detik
   Future<String?> _sendMessageWithFallback(String input) async {
     Object? lastError;
 
@@ -323,10 +334,10 @@ class AiCoachController extends ChangeNotifier {
 
         if (_chatSession == null) continue;
 
-        // Batasi timeout tiap percobaan kandidat maksimal 5 detik
+        // Batasi timeout tiap percobaan kandidat maksimal 8 detik
         final response = await _chatSession!
             .sendMessage(Content.text(input))
-            .timeout(const Duration(seconds: 5));
+            .timeout(const Duration(seconds: 8));
 
         final text = response.text?.trim();
         if (text != null && text.isNotEmpty) {
