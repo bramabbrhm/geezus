@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:geezus/features/auth/views/login_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/utils/notification_service.dart';
 import 'shared/root_navigation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.initNotification();
+  await Supabase.initialize(
+    url: 'https://ubzviqaxylkmabsscite.supabase.co', // Ganti dengan Project URL kamu
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVienZpcWF4eWxrbWFic3NjaXRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIyMzY2MDgsImV4cCI6MjEwNzgxMjYwOH0.Nr47rr0qtYtrNUnGGfGiIcHJZ_MfxntnZHvI93vu5mI',            // Anon Key
+  );
   runApp(const GeezusApp());
 }
 
@@ -21,7 +25,7 @@ class GeezusApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF121212),
         primaryColor: const Color(0xFF6C5CE7),
       ),
-      home: const LoginScreen(),
+      home: const RootNavigation(),
     );
   }
 }
