@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../features/ai_coach/views/ai_coach_screen.dart';
-import '../features/boss_battle/views/boss_battle_screen.dart';
 import '../features/tracking/views/live_run_screen.dart';
+import '../features/boss_battle/views/boss_battle_screen.dart';
+import '../features/ai_coach/views/ai_coach_screen.dart';
 import '../features/auth/views/profile_screen.dart';
 
 class RootNavigation extends StatefulWidget {

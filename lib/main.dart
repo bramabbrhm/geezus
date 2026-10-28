@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geezus/features/auth/views/login_screen.dart';
 import 'core/utils/notification_service.dart';
 import 'shared/root_navigation.dart';
 
@@ -20,7 +21,7 @@ class GeezusApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF121212),
         primaryColor: const Color(0xFF6C5CE7),
       ),
-      home: const RootNavigation(),
+      home: const LoginScreen(),
     );
   }
 }
