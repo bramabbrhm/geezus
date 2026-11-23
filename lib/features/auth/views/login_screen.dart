@@ -13,12 +13,35 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _identifierController = TextEditingController(); // Email atau Username
+  final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   final _storage = const FlutterSecureStorage();
   final LocalAuthentication _auth = LocalAuthentication();
   bool _isLoading = false;
+  // Whether this device supports biometrics AND user has logged in before
+  bool _biometricReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometricReady();
+  }
+
+  Future<void> _checkBiometricReady() async {
+    try {
+      final canCheck = await _auth.canCheckBiometrics;
+      final supported = await _auth.isDeviceSupported();
+      if (!canCheck || !supported) return;
+      // Only show biometric button if user has logged in at least once
+      final bioEmail = await _storage.read(key: 'biometric_email');
+      if (mounted) {
+        setState(() {
+          _biometricReady = bioEmail != null && bioEmail.isNotEmpty;
+        });
+      }
+    } catch (_) {}
+  }
 
   // Fungsi Login dengan Validasi Email/Username via AuthController (Supabase & Fallback Lokal)
   Future<void> _handleLogin() async {
@@ -43,8 +66,17 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = false);
 
     if (success) {
-      await _storage.write(key: 'biometric_enabled', value: 'true');
+      // Store email specifically for biometric — this key is NOT deleted on logout
+      // so biometric can still work on the next app open.
+      final loggedEmail = _identifierController.text.trim().contains('@')
+          ? _identifierController.text.trim()
+          : (await _storage.read(key: 'active_email') ?? '');
+      if (loggedEmail.isNotEmpty) {
+        await _storage.write(key: 'biometric_email', value: loggedEmail);
+        await _storage.write(key: 'biometric_enabled', value: 'true');
+      }
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login Berhasil! Selamat datang.')),
       );
@@ -87,20 +119,34 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (authenticated) {
-        String? activeEmail = await _storage.read(key: 'active_email');
+        // Try biometric_email first (persists across logout), fall back to active_email
+        String? bioEmail = await _storage.read(key: 'biometric_email');
+        bioEmail ??= await _storage.read(key: 'active_email');
+
         if (!mounted) return;
-        if (activeEmail != null) {
+        if (bioEmail != null && bioEmail.isNotEmpty) {
+          // Restore the active session so the app knows who is logged in
+          await _storage.write(key: 'active_email', value: bioEmail);
+          final savedUsername = await _storage.read(key: 'reg_username_$bioEmail');
+          if (savedUsername != null) {
+            await _storage.write(key: 'active_username', value: savedUsername);
+          }
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Autentikasi Biometrik Berhasil!')),
           );
-
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const RootNavigation()),
           );
         } else {
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Silakan Login manual terlebih dahulu untuk mengaktifkan biometrik pertama kali.')),
+            const SnackBar(
+              content: Text(
+                'Silakan Login manual terlebih dahulu sekali untuk mengaktifkan biometrik.',
+              ),
+            ),
           );
         }
       }
@@ -198,23 +244,45 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Tombol Login Biometrik
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF6C5CE7), width: 1.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              // Tombol Login Biometrik — hanya tampil jika sudah pernah login sebelumnya
+              if (_biometricReady)
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF6C5CE7), width: 1.5),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: _isLoading ? null : _handleBiometricLogin,
+                    icon: const Icon(Icons.fingerprint, color: Color(0xFF6C5CE7)),
+                    label: const Text(
+                      'Login dengan Biometrik',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600),
+                    ),
                   ),
-                  onPressed: _isLoading ? null : _handleBiometricLogin,
-                  icon: const Icon(Icons.fingerprint, color: Color(0xFF6C5CE7)),
-                  label: const Text(
-                    'Login dengan Biometrik',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                )
+              else
+                // Info text: biometric will appear after first login
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.fingerprint,
+                          color: Colors.white24, size: 16),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Login manual sekali untuk mengaktifkan biometrik',
+                        style: TextStyle(color: Colors.white38, fontSize: 11),
+                      ),
+                    ],
                   ),
                 ),
-              ),
               const SizedBox(height: 32),
 
               // Tombol Pindah ke Halaman Registrasi

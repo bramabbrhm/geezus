@@ -152,7 +152,7 @@ class AiCoachController extends ChangeNotifier {
   }
 
   /// Ekstraksi nilai log gym secara aman (defensive) dan catat ke GymStore
-  void _handleLocalGymLog(String input) {
+  Future<void> _handleLocalGymLog(String input) async {
     try {
       final lower = input.toLowerCase();
 
@@ -208,7 +208,7 @@ class AiCoachController extends ChangeNotifier {
       }
 
       // Simpan ke GymStore terpusat (notifikasi otomatis ke Boss Battle Screen)
-      GymStore.instance.addLog(exerciseName, weight, sets, reps);
+      await GymStore.instance.addLog(exerciseName, weight, sets, reps);
 
       final double addedVolume = weight * sets * reps;
       final int addedDamage = (addedVolume * 0.08).round();

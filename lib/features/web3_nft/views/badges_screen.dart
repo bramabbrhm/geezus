@@ -336,7 +336,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _controller.badges.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
+              separatorBuilder: (context, i) => const SizedBox(height: 14),
               itemBuilder: (context, index) {
                 final badge = _controller.badges[index];
                 return _buildBadgeCard(badge);

@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/route_model.dart';
 
-/// Controller untuk fitur pencarian dan filter rute lari dari Supabase
+/// Controller untuk fitur pencarian dan filter rute lari dari Supabase.
+/// Jika tabel 'routes' belum ada di Supabase atau tidak dapat diakses,
+/// controller secara otomatis menampilkan data rute lokal sebagai fallback.
 class SearchRoutesController extends ChangeNotifier {
   final SupabaseClient _supabase;
 
@@ -13,6 +15,7 @@ class SearchRoutesController extends ChangeNotifier {
   List<RouteModel> _filteredRoutes = [];
   bool _isLoading = false;
   String? _errorMessage;
+  bool _usingLocalFallback = false;
   String _searchQuery = '';
   String _selectedDifficulty = 'All';
   RouteModel? _selectedRoute;
@@ -25,90 +28,131 @@ class SearchRoutesController extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   String get selectedDifficulty => _selectedDifficulty;
   RouteModel? get selectedRoute => _selectedRoute;
-  bool get hasError => _errorMessage != null;
+  bool get hasError => _errorMessage != null && !_usingLocalFallback;
   bool get isEmpty => !_isLoading && _filteredRoutes.isEmpty;
+  bool get usingLocalFallback => _usingLocalFallback;
 
-  /// Mengambil daftar seluruh rute dari tabel 'routes' di Supabase
+  // ── Local fallback data ───────────────────────────────────────────────────
+  // Ditampilkan ketika tabel 'routes' di Supabase belum dibuat atau tidak
+  // dapat diakses (koneksi putus, RLS, dsb).
+  static final List<RouteModel> _localFallbackRoutes = [
+    const RouteModel(
+      id: 'local_1',
+      name: 'Rute Kampus UGM',
+      activityType: 'running',
+      distanceKm: 5.2,
+      difficulty: 'Easy',
+      description: 'Rute lari ringan di area kampus Universitas Gadjah Mada.',
+      startLat: -7.7700,
+      startLng: 110.3775,
+    ),
+    const RouteModel(
+      id: 'local_2',
+      name: 'Jalan Malioboro Loop',
+      activityType: 'running',
+      distanceKm: 7.5,
+      difficulty: 'Medium',
+      description:
+          'Rute perkotaan melewati kawasan wisata Malioboro dan sekitarnya.',
+      startLat: -7.7956,
+      startLng: 110.3695,
+    ),
+    const RouteModel(
+      id: 'local_3',
+      name: 'Jalur Merapi Trail',
+      activityType: 'trail_run',
+      distanceKm: 10.0,
+      difficulty: 'Hard',
+      description: 'Trek gunung melewati jalur bawah Gunung Merapi.',
+      startLat: -7.6414,
+      startLng: 110.4458,
+    ),
+    const RouteModel(
+      id: 'local_4',
+      name: 'Promenade Pantai Parangtritis',
+      activityType: 'running',
+      distanceKm: 4.0,
+      difficulty: 'Easy',
+      description: 'Lari santai di bibir pantai Parangtritis saat pagi hari.',
+      startLat: -8.0251,
+      startLng: 110.3327,
+    ),
+    const RouteModel(
+      id: 'local_5',
+      name: 'Rute Kota Tua Yogyakarta',
+      activityType: 'running',
+      distanceKm: 6.3,
+      difficulty: 'Medium',
+      description: 'Melewati jalan-jalan bersejarah di pusat kota Yogyakarta.',
+      startLat: -7.8013,
+      startLng: 110.3645,
+    ),
+  ];
+
+  // ── Supabase fetch ────────────────────────────────────────────────────────
+
+  /// Mengambil daftar rute dari tabel 'routes' di Supabase.
+  /// Jika gagal, otomatis beralih ke data rute lokal sebagai fallback.
   Future<void> fetchRoutes() async {
     _isLoading = true;
     _errorMessage = null;
+    _usingLocalFallback = false;
     notifyListeners();
 
     try {
       final response = await _supabase
           .from('routes')
           .select()
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false)
+          .timeout(const Duration(seconds: 8));
 
       final List<dynamic> data = response as List<dynamic>;
       _routes = data
           .map((item) => RouteModel.fromJson(item as Map<String, dynamic>))
           .toList();
 
-      _applyFilters();
+      if (_routes.isEmpty) {
+        // Tabel ada tapi kosong — tampilkan fallback
+        _useFallback();
+      } else {
+        _applyFilters();
+      }
     } catch (e) {
-      _errorMessage = 'Gagal memuat rute dari Supabase: $e';
-      debugPrint('SearchRoutesController error: $e');
+      debugPrint('SearchRoutesController fetchRoutes error: $e');
+      // Sembunyikan detail teknis Supabase, tampilkan fallback
+      _useFallback();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  /// Update query pencarian lokal (nama rute atau deskripsi)
+  void _useFallback() {
+    _usingLocalFallback = true;
+    _routes = List.from(_localFallbackRoutes);
+    _applyFilters();
+    debugPrint('SearchRoutesController: using local fallback routes');
+  }
+
+  // ── Filter & search ───────────────────────────────────────────────────────
+
   void onSearchQueryChanged(String query) {
     _searchQuery = query;
     _applyFilters();
     notifyListeners();
   }
 
-  /// Update filter berdasarkan tingkat kesulitan ('All', 'Easy', 'Medium', 'Hard')
   void onDifficultyFilterChanged(String difficulty) {
     _selectedDifficulty = difficulty;
     _applyFilters();
     notifyListeners();
   }
 
-  /// Memilih satu rute tertentu untuk dijadikan target tracking atau preview di peta
   void selectRoute(RouteModel? route) {
     _selectedRoute = route;
     notifyListeners();
   }
 
-  /// Menjalankan query pencarian langsung ke database Supabase (server-side search)
-  Future<void> searchRoutesDirectly(String query) async {
-    _isLoading = true;
-    _errorMessage = null;
-    _searchQuery = query;
-    notifyListeners();
-
-    try {
-      var queryBuilder = _supabase.from('routes').select();
-
-      if (query.trim().isNotEmpty) {
-        queryBuilder = queryBuilder.ilike('name', '%$query%');
-      }
-
-      if (_selectedDifficulty != 'All') {
-        queryBuilder = queryBuilder.eq('difficulty', _selectedDifficulty);
-      }
-
-      final response = await queryBuilder.order('distance_km', ascending: true);
-      final List<dynamic> data = response as List<dynamic>;
-
-      _filteredRoutes = data
-          .map((item) => RouteModel.fromJson(item as Map<String, dynamic>))
-          .toList();
-    } catch (e) {
-      _errorMessage = 'Pencarian langsung ke Supabase gagal: $e';
-      debugPrint('searchRoutesDirectly error: $e');
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  /// Logika filter lokal (client-side) dari data rute yang sudah diunduh
   void _applyFilters() {
     _filteredRoutes = _routes.where((route) {
       final queryLower = _searchQuery.toLowerCase().trim();
@@ -117,13 +161,13 @@ class SearchRoutesController extends ChangeNotifier {
           (route.description?.toLowerCase().contains(queryLower) ?? false);
 
       final matchesDifficulty = _selectedDifficulty == 'All' ||
-          route.difficulty.toLowerCase() == _selectedDifficulty.toLowerCase();
+          route.difficulty.toLowerCase() ==
+              _selectedDifficulty.toLowerCase();
 
       return matchesQuery && matchesDifficulty;
     }).toList();
   }
 
-  /// Reset semua filter pencarian
   void resetFilters() {
     _searchQuery = '';
     _selectedDifficulty = 'All';
@@ -131,4 +175,3 @@ class SearchRoutesController extends ChangeNotifier {
     notifyListeners();
   }
 }
-

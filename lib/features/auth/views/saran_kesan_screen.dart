@@ -57,18 +57,9 @@ class _SaranKesanScreenState extends State<SaranKesanScreen> {
       debugPrint('Error loading feedback from SharedPreferences: $e');
     }
 
-    // Default initial card jika SharedPreferences kosong
+    // Belum ada feedback — tampilkan list kosong
     setState(() {
-      _feedbackList = [
-        {
-          'author': 'Mahasiswa PAM (CyberRunner#77)',
-          'kesan':
-              'Kuliah PAM sangat menantang dan membuka wawasan luas mengenai pengembangan aplikasi cross-platform modern menggunakan Flutter, mulai dari integrasi sensor hingga arsitektur yang bersih.',
-          'saran':
-              'Semoga ke depannya semakin banyak sesi studi kasus penerapan arsitektur modular yang kompleks seperti Web3 dan AI di dalam Flutter.',
-          'date': '28 Okt 2026',
-        },
-      ];
+      _feedbackList = [];
       _isLoading = false;
     });
   }
@@ -276,12 +267,28 @@ class _SaranKesanScreenState extends State<SaranKesanScreen> {
 
             if (_isLoading)
               const Center(child: CircularProgressIndicator(color: _primaryColor))
+            else if (_feedbackList.isEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                alignment: Alignment.center,
+                child: const Column(
+                  children: [
+                    Icon(Icons.inbox_outlined, color: Colors.white24, size: 40),
+                    SizedBox(height: 10),
+                    Text(
+                      'Belum ada feedback.\nIsi form di atas lalu kirim!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white38, fontSize: 13, height: 1.5),
+                    ),
+                  ],
+                ),
+              )
             else
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _feedbackList.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                separatorBuilder: (context, i) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final item = _feedbackList[index];
                   return Container(
@@ -295,18 +302,17 @@ class _SaranKesanScreenState extends State<SaranKesanScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.account_circle, color: _primaryColor, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  item['author'] ?? 'Anonim',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                ),
-                              ],
+                            const Icon(Icons.account_circle, color: _primaryColor, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                item['author'] ?? 'Anonim',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               item['date'] ?? '',
                               style: const TextStyle(color: Colors.white38, fontSize: 11),

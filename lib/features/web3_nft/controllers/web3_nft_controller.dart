@@ -25,7 +25,14 @@ class Web3NftController extends ChangeNotifier {
 
   Web3NftController() {
     _initBadges();
-    _syncWithGymStore();
+    // Load data from SQLite before syncing badges
+    if (!GymStore.instance.isLoaded) {
+      GymStore.instance.loadFromDatabase().then((_) {
+        _syncWithGymStore();
+      });
+    } else {
+      _syncWithGymStore();
+    }
     GymStore.instance.addListener(_syncWithGymStore);
   }
 
@@ -40,25 +47,25 @@ class Web3NftController extends ChangeNotifier {
       const NftBadgeModel(
         id: 'first_5k',
         title: 'First 5K',
-        description: 'Selesaikan lari 5 km pertama di dunia nyata untuk membuka medal ini.',
+        description: 'Selesaikan lari 5 km dari sesi Live Run Tracking untuk membuka badge ini.',
         category: 'Running',
         icon: Icons.directions_run_rounded,
         badgeColor: Color(0xFF00E676),
-        isUnlocked: true, // Default true karena weeklyRunKm GymStore awal = 5.0
+        isUnlocked: false, // Dibuka berdasarkan data lari nyata di GymStore
       ),
       const NftBadgeModel(
         id: 'boss_slayer',
         title: 'Boss Slayer',
-        description: 'Kalahkan Dungeon Boss Tingkat 1 dengan gabungan Gym Volume & Run Damage.',
+        description: 'Kalahkan Dungeon Boss Tingkat 1. Badge ini dibuka setelah kamu benar-benar mengalahkan boss di layar Boss Battle.',
         category: 'Boss Battle',
         icon: Icons.shield_rounded,
         badgeColor: Color(0xFFFF5252),
-        isUnlocked: true, // Unlocked agar penguji dapat langsung mencoba simulasi minting
+        isUnlocked: false, // Dibuka setelah boss dikalahkan (lihat BossBattleScreen)
       ),
       const NftBadgeModel(
         id: 'century_lifter',
         title: 'Century Lifter',
-        description: 'Kumpulkan akumulasi beban angkat gym mencapai total 1.000 kg di Gym Store.',
+        description: 'Kumpulkan akumulasi volume gym (beban × set × rep) mencapai total 1.000 kg.',
         category: 'Gym',
         icon: Icons.fitness_center_rounded,
         badgeColor: Color(0xFFFFD600),
@@ -67,7 +74,7 @@ class Web3NftController extends ChangeNotifier {
       const NftBadgeModel(
         id: 'speed_demon',
         title: 'Speed Demon',
-        description: 'Akumulasikan total jarak lari 10 km dalam live tracking rute.',
+        description: 'Akumulasikan total jarak lari 10 km dari sesi Live Run Tracking.',
         category: 'Running',
         icon: Icons.bolt_rounded,
         badgeColor: Color(0xFF00B0FF),
@@ -135,17 +142,21 @@ class Web3NftController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Simulasi delay konfirmasi blockchain Polygon (2 detik)
+      // ⚠️ SIMULASI — Ini bukan transaksi blockchain sungguhan.
+      // Hash transaksi yang dihasilkan adalah acak dan tidak tercatat
+      // di Polygon Amoy Testnet atau jaringan blockchain mana pun.
+      // Untuk minting NFT nyata diperlukan: wallet MetaMask, MATIC,
+      // smart contract yang dideploy, dan integrasi web3dart.
       await Future.delayed(const Duration(seconds: 2));
 
-      // Buat Hash Transaksi Polygon realistis: '0x' diikuti 64 karakter hex
       final random = Random();
       final chars = '0123456789abcdef';
       final buffer = StringBuffer('0x');
       for (int i = 0; i < 64; i++) {
         buffer.write(chars[random.nextInt(chars.length)]);
       }
-      final txHash = buffer.toString();
+      // txHash is SIMULATED — not a real blockchain transaction
+      final txHash = '[SIMULASI] ${buffer.toString()}';
       final tokenId = '#${1000 + random.nextInt(9000)}';
       final mintedAt = DateTime.now();
 

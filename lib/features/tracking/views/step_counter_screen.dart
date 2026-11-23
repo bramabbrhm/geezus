@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import '../../../core/storage/sqlite_helper.dart';
 
 class StepCounterScreen extends StatefulWidget {
   const StepCounterScreen({super.key});
@@ -11,28 +12,35 @@ class StepCounterScreen extends StatefulWidget {
 }
 
 class _StepCounterScreenState extends State<StepCounterScreen> {
-  // Warna Palette Geezus
   static const Color _primaryColor = Color(0xFF6C5CE7);
   static const Color _cardColor = Color(0xFF1E1E2C);
   static const Color _bgColor = Color(0xFF121212);
 
-  // Subskripsi Stream Sensor
+  // Sensor subscriptions
   StreamSubscription<UserAccelerometerEvent>? _accelSubscription;
   StreamSubscription<GyroscopeEvent>? _gyroSubscription;
 
-  // Stat Hitung Langkah (Accelerometer)
+  // Step counter state
   int _stepCount = 0;
   final int _dailyGoal = 10000;
   bool _canCountStep = true;
+  bool _sensorAvailable = true;
 
-  // Stat Kemiringan (Gyroscope)
+  // Gyroscope data
   double _gyroX = 0.0;
   double _gyroY = 0.0;
   double _gyroZ = 0.0;
 
+  // Persistence
+  bool _isLoading = true;
+  String _todayKey = '';
+  Timer? _saveDebounce;
+
   @override
   void initState() {
     super.initState();
+    _todayKey = DateTime.now().toIso8601String().substring(0, 10);
+    _loadTodaySteps();
     _initSensors();
   }
 
@@ -40,45 +48,85 @@ class _StepCounterScreenState extends State<StepCounterScreen> {
   void dispose() {
     _accelSubscription?.cancel();
     _gyroSubscription?.cancel();
+    _saveDebounce?.cancel();
+    // Persist final count before leaving screen
+    _persistSteps();
     super.dispose();
   }
 
-  // Defensive Programming: Inisialisasi listener sensor dengan penanganan error
+  // ── Persistence ──────────────────────────────────────────────────────────
+
+  Future<void> _loadTodaySteps() async {
+    try {
+      final row = await SqliteHelper.instance.getTodayStepCount();
+      if (row != null && row['date'] == _todayKey) {
+        final savedSteps = (row['step_count'] as num?)?.toInt() ?? 0;
+        if (mounted) {
+          setState(() {
+            _stepCount = savedSteps;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('StepCounter: loadTodaySteps error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _scheduleSave() {
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(seconds: 3), _persistSteps);
+  }
+
+  Future<void> _persistSteps() async {
+    try {
+      final km = _stepCount * 0.00075;
+      final cal = (_stepCount * 0.04).round();
+      await SqliteHelper.instance.saveStepCount(
+        steps: _stepCount,
+        estimatedKm: km,
+        estimatedCalories: cal,
+      );
+    } catch (e) {
+      debugPrint('StepCounter: persistSteps error: $e');
+    }
+  }
+
+  // ── Sensors ───────────────────────────────────────────────────────────────
+
   void _initSensors() {
     try {
-      // 1. Accelerometer: Deteksi guncangan langkah kaki
       _accelSubscription = userAccelerometerEventStream().listen(
         (UserAccelerometerEvent event) {
           if (!mounted) return;
 
-          // Hitung magnitudo akselerasi total (vektor X, Y, Z)
-          double magnitude = sqrt(
+          final double magnitude = sqrt(
             event.x * event.x + event.y * event.y + event.z * event.z,
           );
 
-          // Ambang batas akselerasi langkah lari/jalan (~11.5 m/s²)
+          // Threshold ~11.5 m/s² detects a step (walking/running)
           if (magnitude > 11.5 && _canCountStep) {
             setState(() {
               _stepCount++;
               _canCountStep = false;
             });
 
-            // Cooldown 350ms agar tidak double count dalam 1 langkah
+            // 350ms cooldown prevents double-counting one step
             Future.delayed(const Duration(milliseconds: 350), () {
-              if (mounted) {
-                setState(() {
-                  _canCountStep = true;
-                });
-              }
+              if (mounted) setState(() => _canCountStep = true);
             });
+
+            // Debounced save every 3s
+            _scheduleSave();
           }
         },
         onError: (error) {
-          debugPrint('Error Accelerometer: $error');
+          debugPrint('Accelerometer error: $error');
+          if (mounted) setState(() => _sensorAvailable = false);
         },
       );
 
-      // 2. Gyroscope: Deteksi posisi kemiringan HP
       _gyroSubscription = gyroscopeEventStream().listen(
         (GyroscopeEvent event) {
           if (!mounted) return;
@@ -89,25 +137,59 @@ class _StepCounterScreenState extends State<StepCounterScreen> {
           });
         },
         onError: (error) {
-          debugPrint('Error Gyroscope: $error');
+          debugPrint('Gyroscope error: $error');
         },
       );
     } catch (e) {
-      debugPrint('Gagal membaca sensor hardware: $e');
+      debugPrint('Sensor init failed: $e');
+      if (mounted) setState(() => _sensorAvailable = false);
     }
   }
 
-  void _resetSteps() {
-    setState(() {
-      _stepCount = 0;
-    });
+  Future<void> _resetSteps() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _cardColor,
+        title: const Text('Reset Hitungan?',
+            style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Hitungan langkah hari ini akan di-reset ke 0.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style:
+                ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reset', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _stepCount = 0);
+      await _persistSteps();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    double progress = (_stepCount / _dailyGoal).clamp(0.0, 1.0);
-    double estimatedKm = _stepCount * 0.00075; // Asumsi 1 langkah = 0.75 meter
-    int estimatedCalories = (_stepCount * 0.04).round(); // Asumsi 1 langkah = 0.04 kalori
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF121212),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFF6C5CE7))),
+      );
+    }
+
+    final double progress = (_stepCount / _dailyGoal).clamp(0.0, 1.0);
+    final double estimatedKm = _stepCount * 0.00075;
+    final int estimatedCalories = (_stepCount * 0.04).round();
 
     return Scaffold(
       backgroundColor: _bgColor,
@@ -118,13 +200,39 @@ class _StepCounterScreenState extends State<StepCounterScreen> {
         ),
         backgroundColor: _cardColor,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
-              // Panel Status Langkah Kaki
+              // Sensor unavailable warning
+              if (!_sensorAvailable)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.4)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.sensors_off, color: Colors.orange, size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Sensor akselerometer tidak tersedia di perangkat ini. Hitungan langkah tidak dapat bekerja.',
+                          style: TextStyle(color: Colors.orange, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Step counter panel
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -143,7 +251,7 @@ class _StepCounterScreenState extends State<StepCounterScreen> {
                       '$_stepCount',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 48,
+                        fontSize: 56,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -157,26 +265,41 @@ class _StepCounterScreenState extends State<StepCounterScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Progress Bar
+                    // Progress bar
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: LinearProgressIndicator(
                         value: progress,
                         minHeight: 12,
                         backgroundColor: Colors.white10,
-                        valueColor: const AlwaysStoppedAnimation<Color>(_primaryColor),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            _primaryColor),
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${(progress * 100).toStringAsFixed(1)}% dari target harian',
+                      style: const TextStyle(
+                          color: Colors.white38, fontSize: 11),
                     ),
                     const SizedBox(height: 20),
 
-                    // Est. Jarak & Kalori
+                    // Est. distance & calories
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildSubStat('JARAK', '${estimatedKm.toStringAsFixed(2)} km'),
-                        Container(height: 24, width: 1, color: Colors.white24),
-                        _buildSubStat('KALORI', '$estimatedCalories kcal'),
+                        _buildSubStat(
+                            'JARAK', '${estimatedKm.toStringAsFixed(2)} km'),
+                        Container(
+                            height: 24, width: 1, color: Colors.white24),
+                        _buildSubStat(
+                            'KALORI*', '$estimatedCalories kcal'),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '* Estimasi kasar — bukan pengukuran medis',
+                      style: TextStyle(color: Colors.white24, fontSize: 10),
                     ),
                   ],
                 ),
@@ -184,7 +307,7 @@ class _StepCounterScreenState extends State<StepCounterScreen> {
 
               const SizedBox(height: 16),
 
-              // Panel Gyroscope (Kemiringan Perangkat)
+              // Gyroscope panel
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -197,17 +320,19 @@ class _StepCounterScreenState extends State<StepCounterScreen> {
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.screen_rotation, color: _primaryColor, size: 20),
+                        Icon(Icons.screen_rotation,
+                            color: _primaryColor, size: 20),
                         SizedBox(width: 8),
                         Text(
                           'Gyroscope (Kemiringan HP)',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
 
-                    // Indicator Visual Kemiringan
+                    // Visual tilt indicator
                     Center(
                       child: Container(
                         width: 160,
@@ -238,13 +363,18 @@ class _StepCounterScreenState extends State<StepCounterScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Nilai Real-time Sumbu Gyroscope
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        Text('X: ${_gyroX.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                        Text('Y: ${_gyroY.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                        Text('Z: ${_gyroZ.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                        Text('X: ${_gyroX.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                color: Colors.white54, fontSize: 12)),
+                        Text('Y: ${_gyroY.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                color: Colors.white54, fontSize: 12)),
+                        Text('Z: ${_gyroZ.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                color: Colors.white54, fontSize: 12)),
                       ],
                     ),
                   ],
@@ -253,17 +383,23 @@ class _StepCounterScreenState extends State<StepCounterScreen> {
 
               const SizedBox(height: 20),
 
-              // Tombol Reset Langkah
+              // Reset button
               SizedBox(
                 width: double.infinity,
                 height: 50,
-                child: OutlinedButton(
+                child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Colors.redAccent),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(25)),
                   ),
                   onPressed: _resetSteps,
-                  child: const Text('RESET HITUNGAN', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.refresh, color: Colors.redAccent),
+                  label: const Text(
+                    'RESET HITUNGAN HARI INI',
+                    style: TextStyle(
+                        color: Colors.redAccent, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
@@ -276,9 +412,17 @@ class _StepCounterScreenState extends State<StepCounterScreen> {
   Widget _buildSubStat(String label, String value) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+        Text(label,
+            style: const TextStyle(
+                color: Colors.white54,
+                fontSize: 11,
+                fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(value,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold)),
       ],
     );
   }

@@ -103,6 +103,11 @@ class _BossBattleScreenState extends State<BossBattleScreen>
     _bossMaxHp = _currentBossMaxHp;
     _bossCurrentHp = _bossMaxHp;
 
+    // Load real activity data from SQLite on first open
+    if (!GymStore.instance.isLoaded) {
+      GymStore.instance.loadFromDatabase();
+    }
+
     _animController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,

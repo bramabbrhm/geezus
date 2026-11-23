@@ -151,6 +151,7 @@ class _SearchRoutesScreenState extends State<SearchRoutesScreen> {
                   );
                 }
 
+                // Error fatal (tidak pernah terjadi karena ada fallback, tapi untuk safety)
                 if (_controller.hasError) {
                   return Center(
                     child: Padding(
@@ -158,11 +159,8 @@ class _SearchRoutesScreenState extends State<SearchRoutesScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
-                            Icons.error_outline,
-                            color: Colors.redAccent,
-                            size: 48,
-                          ),
+                          const Icon(Icons.error_outline,
+                              color: Colors.redAccent, size: 48),
                           const SizedBox(height: 16),
                           Text(
                             _controller.errorMessage ?? 'Terjadi kesalahan',
@@ -172,8 +170,7 @@ class _SearchRoutesScreenState extends State<SearchRoutesScreen> {
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _primaryColor,
-                            ),
+                                backgroundColor: _primaryColor),
                             onPressed: () => _controller.fetchRoutes(),
                             icon: const Icon(Icons.refresh),
                             label: const Text('Coba Lagi'),
@@ -189,30 +186,22 @@ class _SearchRoutesScreenState extends State<SearchRoutesScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(
-                          Icons.route_outlined,
-                          color: Colors.white24,
-                          size: 64,
-                        ),
+                        const Icon(Icons.route_outlined,
+                            color: Colors.white24, size: 64),
                         const SizedBox(height: 12),
-                        const Text(
-                          'Rute tidak ditemukan',
-                          style: TextStyle(
-                            color: Colors.white54,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        const Text('Rute tidak ditemukan',
+                            style: TextStyle(
+                                color: Colors.white54,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500)),
                         const SizedBox(height: 8),
                         TextButton(
                           onPressed: () {
                             _searchFieldController.clear();
                             _controller.resetFilters();
                           },
-                          child: const Text(
-                            'Reset Filter',
-                            style: TextStyle(color: _primaryColor),
-                          ),
+                          child: const Text('Reset Filter',
+                              style: TextStyle(color: _primaryColor)),
                         ),
                       ],
                     ),
@@ -223,14 +212,52 @@ class _SearchRoutesScreenState extends State<SearchRoutesScreen> {
                   color: _primaryColor,
                   backgroundColor: _cardColor,
                   onRefresh: () => _controller.fetchRoutes(),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _controller.routes.length,
-                    separatorBuilder: (ctx, _) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final route = _controller.routes[index];
-                      return _buildRouteCard(route);
-                    },
+                  child: Column(
+                    children: [
+                      // Banner jika menggunakan data lokal (Supabase belum dikonfigurasi)
+                      if (_controller.usingLocalFallback)
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: Colors.amber.withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline,
+                                  color: Colors.amber, size: 16),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Menampilkan rute contoh lokal. Hubungkan tabel '
+                                  '"routes" di Supabase untuk rute dari server.',
+                                  style: TextStyle(
+                                      color: Colors.amber,
+                                      fontSize: 11,
+                                      height: 1.4),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      Expanded(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _controller.routes.length,
+                          separatorBuilder: (ctx, _) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final route = _controller.routes[index];
+                            return _buildRouteCard(route);
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
